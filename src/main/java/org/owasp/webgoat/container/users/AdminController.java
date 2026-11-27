@@ -6,6 +6,7 @@ package org.owasp.webgoat.container.users;
 
 import java.security.SecureRandom;
 import java.util.List;
+import java.util.regex.Pattern;
 import lombok.AllArgsConstructor;
 import org.owasp.webgoat.container.i18n.PluginMessages;
 import org.owasp.webgoat.container.session.Course;
@@ -40,6 +41,7 @@ public class AdminController {
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$";
   private static final int TEMP_PASSWORD_LENGTH = 12;
   private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+  private static final Pattern VALID_USERNAME = Pattern.compile("^[A-Za-z0-9._@-]{1,64}$");
 
   private final UserService userService;
   private final UserProgressRepository userProgressRepository;
@@ -159,6 +161,9 @@ public class AdminController {
   @PostMapping("/users/{username}/reset-password")
   @PreAuthorize("hasAuthority('WEBGOAT_ADMIN')")
   public ResponseEntity<PasswordResetResponse> resetPassword(@PathVariable String username) {
+    if (!isValidUsername(username)) {
+      return ResponseEntity.badRequest().build();
+    }
     String tempPassword = generateTemporaryPassword();
     try {
       userService.resetPassword(username, tempPassword);
@@ -169,6 +174,14 @@ public class AdminController {
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
+
+  /**
+   * Allow-list for usernames accepted by admin operations. Covers locally registered users
+   * ({@code [a-z0-9-]}) and OAuth logins (letters, digits, {@code . _ @ -}).
+   */
+  private static boolean isValidUsername(String username) {
+    return username != null && VALID_USERNAME.matcher(username).matches();
+  }
 
   private static String generateTemporaryPassword() {
     StringBuilder sb = new StringBuilder(TEMP_PASSWORD_LENGTH);
